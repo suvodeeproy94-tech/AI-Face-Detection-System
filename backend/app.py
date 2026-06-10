@@ -8,7 +8,7 @@ detection routes with the frontend.
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-from config import DATA_DIR, FRONTEND_LOCAL_URL, MODELS_DIR
+from config import DATA_DIR, MODELS_DIR
 from database import setup_database
 from routes.detection import detection_routes
 
@@ -18,14 +18,15 @@ def create_app() -> Flask:
 
     app = Flask(__name__)
 
-    # CORS allows the React frontend to call this Flask backend locally.
+    # CORS allows local React dev servers to call this Flask backend.
+    # Vite may use 5173, 5174, or another port if the first port is busy.
     CORS(
         app,
         resources={
             r"/api/*": {
                 "origins": [
-                    FRONTEND_LOCAL_URL,
-                    "http://127.0.0.1:5173",
+                    r"http://127\.0\.0\.1:\d+",
+                    r"http://localhost:\d+",
                 ]
             }
         },

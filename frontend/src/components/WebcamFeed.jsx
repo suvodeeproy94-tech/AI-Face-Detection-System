@@ -98,9 +98,7 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
       onStatsRefresh();
       setErrorMessage("");
     } catch (error) {
-      setErrorMessage(
-        "Detection request failed. Please check if Flask backend is running.",
-      );
+      setErrorMessage(error.message || "Detection request failed.");
     } finally {
       isSendingFrameRef.current = false;
     }
@@ -118,13 +116,21 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
   }
 
   async function sendFrameToBackend(frame) {
-    const response = await fetch(`${API_BASE_URL}/api/detection/frame`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ frame }),
-    });
+    let response;
+
+    try {
+      response = await fetch(`${API_BASE_URL}/api/detection/frame`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ frame }),
+      });
+    } catch (error) {
+      throw new Error(
+        "Detection request failed. Please restart Flask backend and refresh the page.",
+      );
+    }
 
     const responseData = await response.json();
 
