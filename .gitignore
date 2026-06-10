@@ -1,0 +1,40 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Flask and SQLite generated files
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+
+# Large datasets should not be committed
+datasets/WIDER_FACE/images/*
+datasets/WIDER_FACE/annotations/*
+datasets/FDDB/images/*
+datasets/FDDB/annotations/*
+!datasets/WIDER_FACE/images/.gitkeep
+!datasets/WIDER_FACE/annotations/.gitkeep
+!datasets/FDDB/images/.gitkeep
+!datasets/FDDB/annotations/.gitkeep
+
+# Large model binaries should be added only when intentionally needed
+backend/models/face_detector_model/*
+!backend/models/face_detector_model/.gitkeep
+
+# Operating system files
+.DS_Store
+Thumbs.db
