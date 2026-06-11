@@ -37,6 +37,11 @@ backend/data/*.sqlite3
 db.sqlite3
 db.sqlite3-journal
 
+# Generated accuracy reports
+reports/*.json
+!reports/README.md
+!reports/.gitkeep
+
 # Frontend dependencies and build output
 frontend/node_modules/
 frontend/dist/

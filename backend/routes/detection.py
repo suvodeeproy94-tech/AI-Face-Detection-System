@@ -25,13 +25,14 @@ face_tracker = SimpleFaceTracker()
 
 @detection_routes.get("/health")
 def check_backend_health():
-    """Return a simple message so the frontend can check the backend."""
+    """Return backend and model status for quick checking."""
 
     return jsonify(
         {
             "success": True,
             "message": "Face detection backend is running.",
             "model_name": face_detector.model_name,
+            "model_status": face_detector.get_status(),
         }
     )
 
