@@ -13,7 +13,17 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from config import DEFAULT_MODEL_NAME, LOCAL_HAAR_MODEL_PATH
+from config import (
+    DEFAULT_MODEL_NAME,
+    HAAR_FALLBACK_MODEL_NAME,
+    LOCAL_HAAR_MODEL_PATH,
+    MIN_FACE_HEIGHT,
+    MIN_FACE_WIDTH,
+    YUNET_MODEL_PATH,
+    YUNET_NMS_THRESHOLD,
+    YUNET_SCORE_THRESHOLD,
+    YUNET_TOP_K,
+)
 
 
 @dataclass
@@ -44,26 +54,48 @@ class FaceDetector:
     """Detect faces from browser webcam frames using OpenCV."""
 
     def __init__(self) -> None:
-        """Load the Haar Cascade model once when the backend starts."""
+        """Load YuNet first and keep Haar Cascade as a safe fallback."""
 
-        self.model_name = DEFAULT_MODEL_NAME
-        self.classifier = self._load_haar_classifier()
+        self.model_name = HAAR_FALLBACK_MODEL_NAME
+        self.haar_classifier = self._load_haar_classifier()
+        self.yunet_detector = self._load_yunet_detector()
+
+        if self.yunet_detector is not None:
+            self.model_name = DEFAULT_MODEL_NAME
+
+    def _load_yunet_detector(self):
+        """Load the stronger YuNet model when the ONNX file is available."""
+
+        if not hasattr(cv2, "FaceDetectorYN"):
+            return None
+
+        if not YUNET_MODEL_PATH.exists():
+            return None
+
+        return cv2.FaceDetectorYN.create(
+            str(YUNET_MODEL_PATH),
+            "",
+            (640, 480),
+            YUNET_SCORE_THRESHOLD,
+            YUNET_NMS_THRESHOLD,
+            YUNET_TOP_K,
+        )
 
     def _load_haar_classifier(self) -> cv2.CascadeClassifier:
-        """Load the local model first, then use the OpenCV built-in model."""
+        """Load the local Haar model first, then use the OpenCV built-in model."""
 
-        model_path = self._get_available_model_path()
+        model_path = self._get_available_haar_model_path()
         classifier = cv2.CascadeClassifier(str(model_path))
 
         if classifier.empty():
             raise RuntimeError(
-                "Face detection model could not be loaded. "
+                "Fallback face detection model could not be loaded. "
                 "Please check the Haar Cascade XML file."
             )
 
         return classifier
 
-    def _get_available_model_path(self) -> Path:
+    def _get_available_haar_model_path(self) -> Path:
         """Return the best available Haar Cascade model path."""
 
         if LOCAL_HAAR_MODEL_PATH.exists():
@@ -71,19 +103,44 @@ class FaceDetector:
 
         return Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml"
 
+    def get_status(self) -> dict:
+        """Return model status for health checks and viva explanation."""
+
+        return {
+            "active_model": self.model_name,
+            "yunet_available": self.yunet_detector is not None,
+            "yunet_model_path": str(YUNET_MODEL_PATH),
+            "fallback_model": HAAR_FALLBACK_MODEL_NAME,
+            "target_accuracy_note": (
+                "95% accuracy must be measured on a labeled test dataset."
+            ),
+        }
+
     def detect_from_base64_frame(self, base64_frame: str) -> dict:
         """Detect faces from a base64 webcam frame."""
 
-        start_time = time.perf_counter()
         frame = self._decode_base64_image(base64_frame)
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        return self.detect_from_image_array(frame)
 
-        # Equalization improves contrast and helps detection in normal light.
-        gray_frame = cv2.equalizeHist(gray_frame)
+    def detect_from_image_file(self, image_path: str | Path) -> dict:
+        """Detect faces from an image file. This is used by accuracy scripts."""
 
-        face_boxes = self._detect_faces(gray_frame)
+        frame = cv2.imread(str(image_path))
+
+        if frame is None:
+            raise ValueError(f"Image could not be read: {image_path}")
+
+        return self.detect_from_image_array(frame)
+
+    def detect_from_image_array(self, frame: np.ndarray) -> dict:
+        """Detect faces from an OpenCV image array."""
+
+        start_time = time.perf_counter()
+        prepared_frame = self._prepare_frame_for_detection(frame)
+        face_boxes = self._detect_faces(prepared_frame)
         processing_time_ms = (time.perf_counter() - start_time) * 1000
         average_confidence = self._calculate_average_confidence(face_boxes)
+        quality_result = self._get_frame_quality(frame, face_boxes, average_confidence)
 
         return {
             "faces": [face_box.to_dict() for face_box in face_boxes],
@@ -93,6 +150,9 @@ class FaceDetector:
             "frame_width": int(frame.shape[1]),
             "frame_height": int(frame.shape[0]),
             "model_name": self.model_name,
+            "yunet_available": self.yunet_detector is not None,
+            "quality_status": quality_result["status"],
+            "quality_message": quality_result["message"],
         }
 
     def _decode_base64_image(self, base64_frame: str) -> np.ndarray:
@@ -116,23 +176,124 @@ class FaceDetector:
 
         return base64_frame
 
-    def _detect_faces(self, gray_frame: np.ndarray) -> list[FaceBox]:
-        """Detect faces and return them as clear box objects."""
+    def _prepare_frame_for_detection(self, frame: np.ndarray) -> np.ndarray:
+        """
+        Improve very dark or very bright webcam frames before detection.
+
+        This small preprocessing step helps the detector in normal room light.
+        It keeps the code simple and easy to explain.
+        """
+
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        average_brightness = float(np.mean(gray_frame))
+
+        if average_brightness < 75:
+            return cv2.convertScaleAbs(frame, alpha=1.25, beta=35)
+
+        if average_brightness > 190:
+            return cv2.convertScaleAbs(frame, alpha=0.9, beta=-12)
+
+        return frame
+
+    def _detect_faces(self, frame: np.ndarray) -> list[FaceBox]:
+        """
+        Use YuNet when available.
+
+        If YuNet is active and it finds no face, we return no face instead of
+        falling back to Haar. This reduces false detections and makes mistakes
+        less common.
+        """
+
+        if self.yunet_detector is not None:
+            self.model_name = DEFAULT_MODEL_NAME
+            return self._detect_faces_with_yunet(frame)
+
+        self.model_name = HAAR_FALLBACK_MODEL_NAME
+        return self._detect_faces_with_haar(frame)
+
+    def _detect_faces_with_yunet(self, frame: np.ndarray) -> list[FaceBox]:
+        """Detect faces using the stronger OpenCV YuNet model."""
+
+        frame_height, frame_width = frame.shape[:2]
+        self.yunet_detector.setInputSize((frame_width, frame_height))
+
+        _status, detections = self.yunet_detector.detect(frame)
+
+        if detections is None:
+            return []
+
+        face_boxes: list[FaceBox] = []
+
+        for detection in detections:
+            confidence = round(float(detection[-1]) * 100, 2)
+
+            if confidence < YUNET_SCORE_THRESHOLD * 100:
+                continue
+
+            face_box = self._create_clipped_face_box(
+                detection=detection,
+                frame_width=frame_width,
+                frame_height=frame_height,
+                confidence=confidence,
+            )
+
+            if face_box is not None:
+                face_boxes.append(face_box)
+
+        return face_boxes
+
+    def _create_clipped_face_box(
+        self,
+        detection: np.ndarray,
+        frame_width: int,
+        frame_height: int,
+        confidence: float,
+    ) -> FaceBox | None:
+        """Create one clean face box and keep it inside the camera frame."""
+
+        x_position = max(0, int(round(float(detection[0]))))
+        y_position = max(0, int(round(float(detection[1]))))
+        right_position = min(frame_width, x_position + int(round(float(detection[2]))))
+        bottom_position = min(frame_height, y_position + int(round(float(detection[3]))))
+
+        width = right_position - x_position
+        height = bottom_position - y_position
+
+        if width < MIN_FACE_WIDTH or height < MIN_FACE_HEIGHT:
+            return None
+
+        return FaceBox(
+            x=x_position,
+            y=y_position,
+            width=width,
+            height=height,
+            confidence=confidence,
+        )
+
+    def _detect_faces_with_haar(self, frame: np.ndarray) -> list[FaceBox]:
+        """Detect faces using Haar Cascade fallback."""
+
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # Equalization improves contrast for the older Haar fallback model.
+        gray_frame = cv2.equalizeHist(gray_frame)
 
         try:
-            rectangles, _reject_levels, level_weights = self.classifier.detectMultiScale3(
-                gray_frame,
-                scaleFactor=1.1,
-                minNeighbors=5,
-                minSize=(45, 45),
-                outputRejectLevels=True,
+            rectangles, _reject_levels, level_weights = (
+                self.haar_classifier.detectMultiScale3(
+                    gray_frame,
+                    scaleFactor=1.08,
+                    minNeighbors=7,
+                    minSize=(MIN_FACE_WIDTH, MIN_FACE_HEIGHT),
+                    outputRejectLevels=True,
+                )
             )
         except cv2.error:
-            rectangles = self.classifier.detectMultiScale(
+            rectangles = self.haar_classifier.detectMultiScale(
                 gray_frame,
-                scaleFactor=1.1,
-                minNeighbors=5,
-                minSize=(45, 45),
+                scaleFactor=1.08,
+                minNeighbors=7,
+                minSize=(MIN_FACE_WIDTH, MIN_FACE_HEIGHT),
             )
             level_weights = [1.0 for _rectangle in rectangles]
 
@@ -158,13 +319,12 @@ class FaceDetector:
         """
         Convert Haar level weight into a simple confidence-like score.
 
-        Haar Cascade does not return a true deep learning probability. This
-        score is useful for the dashboard, but it should be explained as an
-        estimated confidence during viva.
+        Haar Cascade does not return a true deep learning probability. YuNet
+        returns a real score, but this fallback keeps the response format same.
         """
 
-        confidence = 60 + (weight * 8)
-        confidence = max(50, min(confidence, 99))
+        confidence = 56 + (weight * 7)
+        confidence = max(50, min(confidence, 88))
         return round(confidence, 2)
 
     def _calculate_average_confidence(self, face_boxes: list[FaceBox]) -> float:
@@ -175,6 +335,40 @@ class FaceDetector:
 
         total_confidence = sum(face_box.confidence for face_box in face_boxes)
         return round(total_confidence / len(face_boxes), 2)
+
+    def _get_frame_quality(
+        self,
+        frame: np.ndarray,
+        face_boxes: list[FaceBox],
+        average_confidence: float,
+    ) -> dict:
+        """Return a simple quality message for the frontend dashboard."""
+
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        average_brightness = float(np.mean(gray_frame))
+
+        if average_brightness < 65:
+            return {
+                "status": "low_light",
+                "message": "Low light can reduce detection accuracy.",
+            }
+
+        if not face_boxes:
+            return {
+                "status": "searching",
+                "message": "No stable face is detected in this frame.",
+            }
+
+        if average_confidence < 85:
+            return {
+                "status": "medium",
+                "message": "Detection is working, but face quality can improve.",
+            }
+
+        return {
+            "status": "stable",
+            "message": "Face detection is stable.",
+        }
 
 
 class SimpleFaceTracker:

@@ -3,13 +3,13 @@
   It captures frames, sends them to Flask, and draws face boxes on the canvas.
 */
 
-import { Camera, Play, RefreshCw, Square } from "lucide-react";
+import { Camera, Pause, Play, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000";
 
-function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
+function WebcamFeed({ latestResult, onDetectionResult, onStatsRefresh }) {
   const videoRef = useRef(null);
   const captureCanvasRef = useRef(null);
   const overlayCanvasRef = useRef(null);
@@ -26,7 +26,7 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
 
     const detectionInterval = window.setInterval(() => {
       captureAndDetectFrame();
-    }, 700);
+    }, 650);
 
     return () => {
       window.clearInterval(detectionInterval);
@@ -39,8 +39,8 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
           facingMode: "user",
         },
         audio: false,
@@ -112,7 +112,7 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
     canvas.height = videoElement.videoHeight;
 
     context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.78);
+    return canvas.toDataURL("image/jpeg", 0.82);
   }
 
   async function sendFrameToBackend(frame) {
@@ -155,18 +155,20 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
   }
 
   function drawSingleFaceBox(context, face) {
-    const label = `ID ${face.tracking_id} | ${face.confidence}%`;
+    const label = `Face ${face.tracking_id}  ${face.confidence}%`;
+    const labelWidth = Math.max(132, context.measureText(label).width + 22);
+    const labelY = Math.max(face.y - 34, 0);
 
     context.lineWidth = 4;
-    context.strokeStyle = "#10b981";
+    context.strokeStyle = "#14b8a6";
     context.strokeRect(face.x, face.y, face.width, face.height);
 
-    context.fillStyle = "#0f172a";
-    context.fillRect(face.x, Math.max(face.y - 32, 0), 120, 28);
+    context.fillStyle = "rgba(15, 23, 42, 0.92)";
+    context.fillRect(face.x, labelY, labelWidth, 30);
 
     context.fillStyle = "#ffffff";
-    context.font = "16px Arial";
-    context.fillText(label, face.x + 8, Math.max(face.y - 11, 20));
+    context.font = "bold 16px Arial";
+    context.fillText(label, face.x + 10, labelY + 21);
   }
 
   function clearOverlayCanvas() {
@@ -180,16 +182,21 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
     context.clearRect(0, 0, canvas.width, canvas.height);
   }
 
+  const quality = getQualityDetails(latestResult);
+
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-950">
-            Live Webcam Detection
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Start the camera and the backend will detect faces in real time.
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-bold text-slate-950">
+              Live Webcam Detection
+            </h2>
+            <span className={`status-pill ${quality.className}`}>
+              {quality.label}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">{quality.message}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -211,15 +218,15 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
             disabled={!isCameraActive}
             onClick={() => setIsDetecting((currentValue) => !currentValue)}
           >
-            {isDetecting ? <Square size={18} /> : <RefreshCw size={18} />}
+            {isDetecting ? <Pause size={18} /> : <Play size={18} />}
             {isDetecting ? "Pause" : "Resume"}
           </button>
         </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-md bg-slate-950">
+      <div className="relative bg-slate-950">
         {!isCameraActive && (
-          <div className="absolute inset-0 z-10 flex min-h-[320px] flex-col items-center justify-center gap-3 text-slate-300">
+          <div className="absolute inset-0 z-10 flex min-h-[380px] flex-col items-center justify-center gap-3 text-slate-300">
             <Camera size={48} />
             <p className="text-center text-sm font-medium">
               Webcam preview will appear here.
@@ -229,7 +236,7 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
 
         <video
           ref={videoRef}
-          className="block min-h-[320px] w-full bg-slate-950 object-fill"
+          className="block aspect-video w-full bg-slate-950 object-fill"
           muted
           playsInline
         />
@@ -241,7 +248,7 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
       </div>
 
       {errorMessage && (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <p className="m-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {errorMessage}
         </p>
       )}
@@ -249,6 +256,46 @@ function WebcamFeed({ onDetectionResult, onStatsRefresh }) {
       <canvas ref={captureCanvasRef} className="hidden" />
     </section>
   );
+}
+
+function getQualityDetails(latestResult) {
+  if (!latestResult) {
+    return {
+      label: "Ready",
+      message: "Camera is waiting.",
+      className: "status-neutral",
+    };
+  }
+
+  if (latestResult.quality_status === "stable") {
+    return {
+      label: "Stable",
+      message: latestResult.quality_message,
+      className: "status-good",
+    };
+  }
+
+  if (latestResult.quality_status === "low_light") {
+    return {
+      label: "Low Light",
+      message: latestResult.quality_message,
+      className: "status-warning",
+    };
+  }
+
+  if (latestResult.quality_status === "medium") {
+    return {
+      label: "Improve",
+      message: latestResult.quality_message,
+      className: "status-warning",
+    };
+  }
+
+  return {
+    label: "Scanning",
+    message: latestResult.quality_message || "Checking current frame.",
+    className: "status-neutral",
+  };
 }
 
 export default WebcamFeed;

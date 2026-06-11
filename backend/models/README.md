@@ -2,23 +2,26 @@
 
 This folder stores model files used by the backend.
 
-## Current Model
+## Primary Model
+
+```text
+face_detector_model/face_detection_yunet_2023mar.onnx
+```
+
+This is the OpenCV YuNet face detector. It is lightweight, fast, and better
+than Haar Cascade for real-time webcam face detection.
+
+## Fallback Model
 
 ```text
 haarcascade_frontalface_default.xml
 ```
 
-This is an OpenCV Haar Cascade model. It is lightweight and works well for a
-beginner-friendly real-time webcam project.
+This Haar Cascade model is kept as a fallback. The backend uses it only when
+YuNet is not available.
 
 ## Accuracy Note
 
-Haar Cascade is fast, but it may not always reach 95% accuracy in difficult
-conditions such as low light, side faces, blur, or CCTV-style videos.
-
-For a stronger future version, this project can be upgraded to:
-
-- OpenCV DNN Face Detector
-- SSD Face Detector
-- RetinaFace
-- YOLO face detection model
+The project now uses stricter YuNet confidence filtering to reduce wrong
+detections. A 95% accuracy claim still needs a labeled test dataset such as
+WIDER FACE, FDDB, or a manually labeled webcam test set.

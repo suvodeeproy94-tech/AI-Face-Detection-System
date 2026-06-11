@@ -28,14 +28,14 @@ function DetectionStats({ latestResult, savedStats }) {
 
       <StatCard
         icon={<BarChart3 size={22} />}
-        label="Total Frames"
+        label="Scanned Frames"
         value={savedStats.total_frames}
         tone="sky"
       />
 
       <StatCard
         icon={<Database size={22} />}
-        label="Model"
+        label="Active Model"
         value={modelName}
         tone="slate"
       />
@@ -52,17 +52,17 @@ function StatCard({ icon, label, value, tone }) {
   };
 
   return (
-    <article className="rounded-md border border-slate-200 bg-white p-5">
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start gap-4">
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md ${toneClass[tone]}`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${toneClass[tone]}`}
         >
           {icon}
         </div>
 
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-500">{label}</p>
-          <p className="mt-2 break-words text-xl font-bold text-slate-950">
+          <p className="mt-2 break-words text-xl font-bold leading-6 text-slate-950">
             {value}
           </p>
         </div>
