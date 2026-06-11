@@ -14,6 +14,7 @@ function WebcamFeed({ latestResult, onDetectionResult, onStatsRefresh }) {
   const captureCanvasRef = useRef(null);
   const overlayCanvasRef = useRef(null);
   const isSendingFrameRef = useRef(false);
+  const cameraSessionRef = useRef(0);
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
@@ -49,6 +50,7 @@ function WebcamFeed({ latestResult, onDetectionResult, onStatsRefresh }) {
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
 
+      cameraSessionRef.current += 1;
       setIsCameraActive(true);
       setIsDetecting(true);
     } catch (error) {
@@ -70,6 +72,10 @@ function WebcamFeed({ latestResult, onDetectionResult, onStatsRefresh }) {
       videoElement.srcObject = null;
     }
 
+    // This prevents a late API response from drawing an old face box.
+    cameraSessionRef.current += 1;
+    isSendingFrameRef.current = false;
+
     clearOverlayCanvas();
     setIsCameraActive(false);
     setIsDetecting(false);
@@ -88,10 +94,15 @@ function WebcamFeed({ latestResult, onDetectionResult, onStatsRefresh }) {
     }
 
     isSendingFrameRef.current = true;
+    const activeCameraSession = cameraSessionRef.current;
 
     try {
       const frame = captureCurrentFrame(videoElement);
       const detectionResult = await sendFrameToBackend(frame);
+
+      if (activeCameraSession !== cameraSessionRef.current) {
+        return;
+      }
 
       drawDetectionBoxes(detectionResult);
       onDetectionResult(detectionResult);
@@ -180,6 +191,8 @@ function WebcamFeed({ latestResult, onDetectionResult, onStatsRefresh }) {
 
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.width = 0;
+    canvas.height = 0;
   }
 
   const quality = getQualityDetails(latestResult);
@@ -243,7 +256,9 @@ function WebcamFeed({ latestResult, onDetectionResult, onStatsRefresh }) {
 
         <canvas
           ref={overlayCanvasRef}
-          className="pointer-events-none absolute inset-0 h-full w-full"
+          className={`pointer-events-none absolute inset-0 h-full w-full ${
+            isCameraActive ? "block" : "hidden"
+          }`}
         />
       </div>
 
