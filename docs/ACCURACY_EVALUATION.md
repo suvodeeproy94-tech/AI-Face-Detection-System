@@ -100,6 +100,21 @@ The report includes:
 - Precision
 - Whether 95% target was achieved
 
+## Current Project Result
+
+The current project has measured accuracy reports. The best measured result is:
+
+```text
+91.15% detection accuracy on the webcam-style WIDER FACE sample.
+```
+
+So the correct project statement is:
+
+```text
+This project is complete as a working real-time face detection system,
+but it does not claim 95% accuracy.
+```
+
 ## Important Rule For 95%
 
 Do not write that the project has 95% accuracy until the generated report shows:

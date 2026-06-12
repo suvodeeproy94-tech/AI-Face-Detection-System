@@ -31,6 +31,7 @@ This project only detects faces. It does not identify people by name.
 - Live dashboard with model, confidence, timing, and quality status.
 - SQLite detection history.
 - Accuracy evaluation script for labeled datasets.
+- Measured accuracy results documented honestly without claiming 95%.
 - Beginner-friendly and viva-friendly documentation.
 
 ## Technology Stack
@@ -81,7 +82,33 @@ backend/models/haarcascade_frontalface_default.xml
 | SQLite detection history | Completed |
 | Reset statistics | Completed |
 | Accuracy evaluation script | Completed |
+| Accuracy result documentation | Completed |
 | Professional README and docs | Completed |
+
+## Final Project Status
+
+This project is complete as a working real-time face detection system.
+
+The system can:
+
+- Open the webcam from the React frontend.
+- Send webcam frames to the Flask backend.
+- Detect faces using OpenCV YuNet.
+- Draw face boxes on the webcam preview.
+- Count detected faces.
+- Show confidence, processing time, and quality status.
+- Save frame-level detection history in SQLite.
+- Run accuracy evaluation on labeled image datasets.
+
+Important accuracy note:
+
+```text
+The project does not claim 95% accuracy.
+The best measured report in this project is 91.15% detection accuracy
+on the webcam-style WIDER FACE sample.
+```
+
+This keeps the project honest, examiner-safe, and professionally documented.
 
 ## System Architecture
 
@@ -269,7 +296,8 @@ OpenCV YuNet Face Detector
 
 ## Accuracy Evaluation
 
-The project includes a formal accuracy evaluation script.
+The project includes a formal accuracy evaluation script and documented
+measured results.
 
 Annotation format:
 
@@ -291,10 +319,20 @@ Output:
 reports/accuracy_report.json
 ```
 
-Important:
+Current measured results:
+
+| Dataset Report | Images | Real Faces | Detection Accuracy | Precision | 95% Target |
+|---|---:|---:|---:|---:|---|
+| WIDER FACE sample | 100 | 324 | 51.85% | 100.00% | Not met |
+| WIDER FACE closeup sample | 100 | 109 | 85.32% | 75.00% | Not met |
+| WIDER FACE large sample | 100 | 167 | 88.62% | 67.27% | Not met |
+| WIDER FACE webcam-style sample | 100 | 113 | 91.15% | 79.23% | Not met |
+
+Correct project statement:
 
 ```text
-95% accuracy should be claimed only after the generated report proves it.
+This project is a completed real-time face detection system.
+It has measured accuracy results, but it does not claim 95% accuracy.
 ```
 
 More details:
@@ -366,6 +404,7 @@ screenshots/README.md
 | Document | Purpose |
 |---|---|
 | `docs/ACCURACY_EVALUATION.md` | Explains accuracy testing |
+| `docs/ACCURACY_RESULTS.md` | Shows current measured accuracy results |
 | `docs/VIVA_EXPLANATION.md` | Simple viva explanation |
 | `docs/DEPLOYMENT_GUIDE.md` | Deployment preparation |
 | `docs/FINAL_CHECKLIST.md` | Final submission checklist |
@@ -374,7 +413,7 @@ screenshots/README.md
 
 - Accuracy depends on lighting, camera quality, face angle, and distance.
 - Very small or heavily covered faces may be missed.
-- Formal 95% claim requires labeled test data.
+- Current measured reports do not prove 95% accuracy.
 - Webcam access needs localhost or HTTPS.
 - The system does not perform identity recognition.
 
@@ -384,6 +423,7 @@ screenshots/README.md
 - Add video upload detection.
 - Add PDF report export.
 - Add WIDER FACE automated parser.
+- Improve model tuning if a verified 95% accuracy target is required.
 - Deploy frontend and backend online.
 - Add production WSGI server setup.
 

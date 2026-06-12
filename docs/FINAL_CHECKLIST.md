@@ -22,17 +22,27 @@ Use this checklist before presentation, viva, or GitHub submission.
 
 - [x] README is available.
 - [x] Accuracy evaluation guide is available.
+- [x] Current measured accuracy results are documented.
 - [x] Viva explanation is available.
 - [x] Deployment guide is available.
 - [x] Screenshot folder is available.
 
-## Still Needed For 95% Claim
+## Accuracy Claim Status
 
-- [ ] Add labeled test images.
-- [ ] Add real annotation CSV.
-- [ ] Run `scripts/evaluate_accuracy.py`.
-- [ ] Save generated accuracy report.
-- [ ] Mention final tested accuracy in README/report only after testing.
+- [x] Accuracy evaluation script is available.
+- [x] Labeled WIDER FACE sample annotations are available locally.
+- [x] Evaluation reports were reviewed.
+- [x] Best measured result is documented as 91.15%.
+- [x] README does not claim 95% accuracy.
+- [x] 95% accuracy is kept as future improvement only.
+
+## Final Completion Status
+
+- [x] The project is complete as a working real-time face detection system.
+- [x] The project is ready for local demo.
+- [x] The project is ready for viva explanation.
+- [x] The project is ready for portfolio presentation.
+- [x] The project is honest about its measured accuracy.
 
 ## Presentation Reminder
 
@@ -41,5 +51,6 @@ During viva, say:
 ```text
 This system uses OpenCV YuNet for real-time face detection.
 It detects faces only and does not identify people.
-The 95% target must be verified using labeled test data.
+The best measured accuracy is 91.15% on the webcam-style sample.
+This project does not claim 95% accuracy.
 ```
